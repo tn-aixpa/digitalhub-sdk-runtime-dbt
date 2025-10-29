@@ -8,12 +8,12 @@ import typing
 from typing import Callable
 
 from digitalhub.context.api import get_context
-from digitalhub.entities._base.entity._constructors.uuid import build_uuid
-from digitalhub.factory.factory import factory
+from digitalhub.entities._constructors.uuid import build_uuid
+from digitalhub.factory.entity import entity_factory
 from digitalhub.runtimes._base import Runtime
 from digitalhub.utils.logger import LOGGER
 
-from digitalhub_runtime_dbt.entities._commons.enums import TaskActions
+from digitalhub_runtime_dbt.entities._commons.enums import Actions
 from digitalhub_runtime_dbt.utils.configuration import (
     CredsConfigurator,
     cleanup,
@@ -103,7 +103,7 @@ class RuntimeDbt(Runtime):
         run_key = run.get("key")
 
         LOGGER.info("Initializing environment.")
-        configurator = CredsConfigurator(project)
+        configurator = CredsConfigurator()
         _ = configurator.get_creds()
 
         LOGGER.info("Collecting inputs.")
@@ -140,7 +140,7 @@ class RuntimeDbt(Runtime):
         Callable
             Function to execute.
         """
-        if action == TaskActions.TRANSFORM.value:
+        if action == Actions.TRANSFORM.value:
             return transform
         raise NotImplementedError
 
@@ -158,14 +158,10 @@ class RuntimeDbt(Runtime):
             Run spec dict.
         configurator : CredsConfigurator
             Creds configurator.
-
-        Returns
-        -------
-        None
         """
         # Collect input dataitems
         for param, di in spec.get("inputs", {}).items():
-            di = factory.build_entity_from_dict(di)
+            di = entity_factory.build_entity_from_dict(di)
 
             # Register dataitem in a dict to be used for inputs confs generation
             self._input_dataitems.append({"name": param, "id": di.id})
@@ -272,10 +268,6 @@ class RuntimeDbt(Runtime):
         ----------
         configurator : CredsConfigurator
             Creds configurator.
-
-        Returns
-        -------
-        None
         """
         cleanup(
             self._versioned_tables,

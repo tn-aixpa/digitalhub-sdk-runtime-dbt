@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "digitalhub-runtime-dbt"
-version = "0.12.0"
+version = "0.14.0"
 description = "Dbt runtime for DHCore"
 readme = "README.md"
 authors = [
@@ -22,7 +22,7 @@ classifiers = [
 keywords = ["data", "dataops", "kubernetes"]
 requires-python = ">=3.9, <3.13"
 dependencies = [
-"digitalhub[pandas]>=0.12.0b, <0.13",
+"digitalhub[pandas]>=0.14.0, <0.15",
 ]
 [project.optional-dependencies]
 local = [
@@ -30,17 +30,19 @@ local = [
     "dbt-adapters==1.1.1",
 ]
 dev = [
-    "digitalhub[dev]>=0.12.0b, <0.13"
+    "digitalhub[dev]>=0.14.0, <0.15"
 ]
 
 [project.urls]
 Homepage = "https://github.com/scc-digitalhub/digitalhub-sdk-runtime-dbt"
 
-[tool.flake8]
-max-line-length = 120
-
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+docstring-code-line-length = 120
 
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["F401"]
@@ -49,7 +51,7 @@ line-length = 120
 convention = "numpy"
 
 [tool.bumpver]
-current_version = "0.12.0"
+current_version = "0.14.0"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message  = "Bump version {old_version} -> {new_version}"
 commit          = false

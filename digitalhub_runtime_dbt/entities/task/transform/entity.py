@@ -11,8 +11,8 @@ from digitalhub.entities.task._base.entity import Task
 if typing.TYPE_CHECKING:
     from digitalhub.entities._base.entity.metadata import Metadata
 
-    from digitalhub_runtime_dbt.entities.task.dbt_transform.spec import TaskSpecDbtTransform
-    from digitalhub_runtime_dbt.entities.task.dbt_transform.status import TaskStatusDbtTransform
+    from digitalhub_runtime_dbt.entities.task.transform.spec import TaskSpecDbtTransform
+    from digitalhub_runtime_dbt.entities.task.transform.status import TaskStatusDbtTransform
 
 
 class TaskDbtTransform(Task):

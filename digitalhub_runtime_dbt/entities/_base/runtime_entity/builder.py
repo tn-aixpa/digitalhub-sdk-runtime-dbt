@@ -5,19 +5,26 @@
 from __future__ import annotations
 
 from digitalhub.entities._base.runtime_entity.builder import RuntimeEntityBuilder
-from digitalhub.entities.task._base.utils import build_task_actions
+from digitalhub.entities._commons.utils import map_actions
 
-from digitalhub_runtime_dbt.entities._commons.enums import EntityKinds, TaskActions
+from digitalhub_runtime_dbt.entities._commons.enums import Actions, EntityKinds
 
 
 class RuntimeEntityBuilderDbt(RuntimeEntityBuilder):
     EXECUTABLE_KIND = EntityKinds.FUNCTION_DBT.value
-    TASKS_KINDS = build_task_actions(
+    TASKS_KINDS = map_actions(
         [
             (
                 EntityKinds.TASK_DBT_TRANSFORM.value,
-                TaskActions.TRANSFORM.value,
+                Actions.TRANSFORM.value,
             )
         ]
     )
-    RUN_KIND = EntityKinds.RUN_DBT.value
+    RUN_KINDS = map_actions(
+        [
+            (
+                EntityKinds.RUN_DBT_TRANSFORM.value,
+                Actions.TRANSFORM.value,
+            )
+        ]
+    )

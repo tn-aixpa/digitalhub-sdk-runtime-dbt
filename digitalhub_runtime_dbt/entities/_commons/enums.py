@@ -14,10 +14,10 @@ class EntityKinds(Enum):
 
     FUNCTION_DBT = "dbt"
     TASK_DBT_TRANSFORM = "dbt+transform"
-    RUN_DBT = "dbt+run"
+    RUN_DBT_TRANSFORM = "dbt+transform:run"
 
 
-class TaskActions(Enum):
+class Actions(Enum):
     """
     Task actions.
     """

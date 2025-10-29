@@ -38,19 +38,11 @@
         "value": "test"
       }
     ],
-    "resources": {
-      "cpu": {
-        "requests": "0100m",
-        "limits": "0200m"
+      "resources": {
+        "cpu": "1",
+        "mem": "1Gi",
+        "gpu": "1"
       },
-      "mem": {
-        "requests": "0100Ki",
-        "limits": "0200Ki"
-      },
-      "gpu": {
-        "limits": "01"
-      }
-    },
     "secrets": ["secret-key"],
     "node_selector": [
       {
