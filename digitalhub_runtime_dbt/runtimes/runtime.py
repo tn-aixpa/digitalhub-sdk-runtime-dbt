@@ -15,7 +15,6 @@ from digitalhub.utils.logger import LOGGER
 
 from digitalhub_runtime_dbt.entities._commons.enums import Actions
 from digitalhub_runtime_dbt.utils.configuration import (
-    CredsConfigurator,
     cleanup,
     generate_dbt_profile_yml,
     generate_dbt_project_yml,
@@ -102,25 +101,21 @@ class RuntimeDbt(Runtime):
         project = run.get("project")
         run_key = run.get("key")
 
-        LOGGER.info("Initializing environment.")
-        configurator = CredsConfigurator()
-        _ = configurator.get_creds()
-
         LOGGER.info("Collecting inputs.")
-        self._collect_inputs(spec, configurator)
+        self._collect_inputs(spec)
 
         LOGGER.info("Configure execution.")
-        output_table = self._configure_execution(spec, project, configurator)
+        output_table = self._configure_execution(spec, project)
 
         LOGGER.info("Executing run.")
         results = self._execute(executable, output_table, self.runtime_dir)
 
         LOGGER.info("Collecting outputs.")
-        output = self._collect_outputs(results, output_table, project, run_key, configurator)
+        output = self._collect_outputs(results, output_table, project, run_key)
         status = build_status(output, results, output_table)
 
         LOGGER.info("Clean up environment.")
-        self._cleanup(configurator)
+        self._cleanup()
 
         LOGGER.info("Task completed, returning run status.")
         return status
@@ -148,7 +143,7 @@ class RuntimeDbt(Runtime):
     # Inputs
     ##############################
 
-    def _collect_inputs(self, spec: dict, configurator: CredsConfigurator) -> None:
+    def _collect_inputs(self, spec: dict) -> None:
         """
         Parse inputs from run spec and materialize dataitems in postgres.
 
@@ -156,8 +151,6 @@ class RuntimeDbt(Runtime):
         ----------
         spec : dict
             Run spec dict.
-        configurator : CredsConfigurator
-            Creds configurator.
         """
         # Collect input dataitems
         for param, di in spec.get("inputs", {}).items():
@@ -167,7 +160,7 @@ class RuntimeDbt(Runtime):
             self._input_dataitems.append({"name": param, "id": di.id})
 
             # Materialize dataitem in postgres
-            table = materialize_dataitem(di, param, configurator)
+            table = materialize_dataitem(di, param)
 
             # Save versioned table name to be used for cleanup
             self._versioned_tables.append(table)
@@ -180,7 +173,6 @@ class RuntimeDbt(Runtime):
         self,
         spec: dict,
         project: str,
-        configurator: CredsConfigurator,
     ) -> str:
         """
         Initialize a dbt project with a model and a schema definition.
@@ -191,8 +183,6 @@ class RuntimeDbt(Runtime):
             Run spec dict.
         project : str
             The project name.
-        configurator : CredsConfigurator
-            Creds configurator.
 
         Returns
         -------
@@ -206,7 +196,7 @@ class RuntimeDbt(Runtime):
         query = save_function_source(self.tmp_dir, spec.get("source", {}))
 
         # Generate profile yaml file
-        generate_dbt_profile_yml(self.runtime_dir, configurator)
+        generate_dbt_profile_yml(self.runtime_dir)
 
         # Generate project yaml file
         generate_dbt_project_yml(self.runtime_dir, model_dir, project.replace("-", "_"))
@@ -230,7 +220,6 @@ class RuntimeDbt(Runtime):
         output_table: str,
         project: str,
         run_key: str,
-        configurator: CredsConfigurator,
     ) -> Dataitem:
         """
         Collect outputs.
@@ -245,8 +234,6 @@ class RuntimeDbt(Runtime):
             The project name.
         run_key : str
             The run key.
-        configurator : CredsConfigurator
-            Creds configurator.
 
         Returns
         -------
@@ -254,23 +241,14 @@ class RuntimeDbt(Runtime):
             The output dataitem table.
         """
         parsed_result = parse_results(results, output_table, project)
-        return create_dataitem_(parsed_result, project, self.uuid, run_key, configurator)
+        return create_dataitem_(parsed_result, project, self.uuid, run_key)
 
     ##############################
     # Cleanup
     ##############################
 
-    def _cleanup(self, configurator: CredsConfigurator) -> None:
+    def _cleanup(self) -> None:
         """
         Cleanup environment.
-
-        Parameters
-        ----------
-        configurator : CredsConfigurator
-            Creds configurator.
         """
-        cleanup(
-            self._versioned_tables,
-            self.tmp_dir,
-            configurator,
-        )
+        cleanup(self._versioned_tables, self.tmp_dir)

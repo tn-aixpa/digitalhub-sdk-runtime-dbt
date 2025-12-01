@@ -21,8 +21,6 @@ if typing.TYPE_CHECKING:
     from dbt.contracts.results import RunResult
     from digitalhub.entities.dataitem.table.entity import DataitemTable
 
-    from digitalhub_runtime_dbt.utils.configuration import CredsConfigurator
-
 
 # Postgres type mapper to frictionless types.
 TYPE_MAPPER = {
@@ -168,7 +166,6 @@ def create_dataitem_(
     project: str,
     uuid: str,
     run_key: str,
-    configurator: CredsConfigurator,
 ) -> DataitemTable:
     """
     Create new dataitem.
@@ -183,8 +180,6 @@ def create_dataitem_(
         The uuid of the model for outputs versioning.
     run_key : str
         The run key.
-    configurator : CredsConfigurator
-        Creds configurator.
 
     Returns
     -------
@@ -198,7 +193,7 @@ def create_dataitem_(
     """
     try:
         # Get columns and data sample from dbt results
-        conn = get_connection(configurator)
+        conn = get_connection()
         columns, data, rows_count = get_data_sample(result.name, uuid, conn)
 
         # Prepare dataitem kwargs

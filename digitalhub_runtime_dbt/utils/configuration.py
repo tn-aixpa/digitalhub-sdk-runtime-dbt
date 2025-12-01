@@ -9,9 +9,8 @@ import typing
 from pathlib import Path
 
 import psycopg2
-from digitalhub.stores.credentials.enums import CredsEnvVar
+from digitalhub.stores.configurator.enums import ConfigurationVars, CredentialsVars
 from digitalhub.stores.data.api import get_store
-from digitalhub.utils.exceptions import ConfigError
 from digitalhub.utils.generic_utils import decode_base64_string, extract_archive, requests_chunk_download
 from digitalhub.utils.git_utils import clone_repository
 from digitalhub.utils.logger import LOGGER
@@ -25,7 +24,7 @@ from digitalhub.utils.uri_utils import (
 from psycopg2 import sql
 
 if typing.TYPE_CHECKING:
-    from digitalhub.stores.data.sql.configurator import SqlStoreConfigurator
+    from digitalhub.stores.data.sql.store import SqlStore
 
 ##############################
 # Templates
@@ -65,10 +64,7 @@ postgres:
 """.lstrip("\n")
 
 
-def generate_dbt_profile_yml(
-    root: Path,
-    configurator: CredsConfigurator,
-) -> None:
+def generate_dbt_profile_yml(root: Path) -> None:
     """
     Generate dbt profiles.yml configuration file.
 
@@ -80,12 +76,9 @@ def generate_dbt_profile_yml(
     ----------
     root : Path
         The root directory path where the profiles.yml file will be created.
-    configurator : CredsConfigurator
-        The credential configurator instance containing database
-        connection parameters.
     """
     profiles_path = root / "profiles.yml"
-    host, port, user, password, db = configurator.get_creds()
+    host, port, user, password, db = CredsConfigurator().get_creds()
     profiles_path.write_text(PROFILE_TEMPLATE.format(host, user, password, int(port), db))
 
 
@@ -289,89 +282,30 @@ def save_function_source(path: Path, source_spec: dict) -> str:
 class CredsConfigurator:
     """
     Database credentials configurator for dbt operations.
-
-    Manages database connection credentials and provides validated
-    connection parameters for PostgreSQL databases. Includes connection
-    testing and credential caching functionality.
-
-    Attributes
-    ----------
-    cfg : SqlStoreConfigurator
-        The SQL store configurator instance for credential management.
-    _valid_creds : tuple or None
-        Cached valid database credentials to avoid repeated validation.
     """
 
     def __init__(self) -> None:
-        self.cfg: SqlStoreConfigurator = get_store("sql://")._configurator
-        self._valid_creds = None  # cache of valid creds
+        self.store: SqlStore = get_store("sql://")
+        self.store._check_factory()
 
-    def _test_connection(self, creds: tuple) -> tuple[bool, Exception | None]:
-        host, port, user, password, db = creds
-        try:
-            conn = psycopg2.connect(
-                host=host,
-                port=port,
-                database=db,
-                user=user,
-                password=password,
-            )
-            conn.close()
-            return True, None
-        except Exception as e:
-            return False, e
-
-    def get_creds(self, retry: bool = True) -> tuple:
+    def get_creds(self) -> tuple:
         """
         Retrieve and validate database credentials.
-
-        Gets database connection credentials from the configurator,
-        tests the connection, and caches valid credentials for reuse.
-        Supports retry mechanism with alternative credential sources.
-
-        Parameters
-        ----------
-        retry : bool, default True
-            Whether to attempt retry with alternative credential source
-            if the initial connection fails.
 
         Returns
         -------
         tuple
             Database credentials tuple containing (host, port, user,
             password, database) in that order.
-
-        Raises
-        ------
-        RuntimeError
-            If no valid database connection can be established with
-            available credentials.
         """
-        if self._valid_creds is not None:
-            return self._valid_creds
-
-        creds_dict = self.cfg.get_sql_credentials()
-        creds = (
-            creds_dict[CredsEnvVar.DB_HOST.value],
-            creds_dict[CredsEnvVar.DB_PORT.value],
-            creds_dict[CredsEnvVar.DB_USERNAME.value],
-            creds_dict[CredsEnvVar.DB_PASSWORD.value],
-            creds_dict[CredsEnvVar.DB_DATABASE.value],
+        creds_dict = self.store._configurator.get_sql_credentials()
+        return (
+            creds_dict[ConfigurationVars.DB_HOST.value],
+            creds_dict[ConfigurationVars.DB_PORT.value],
+            creds_dict[CredentialsVars.DB_USERNAME.value],
+            creds_dict[CredentialsVars.DB_PASSWORD.value],
+            creds_dict[ConfigurationVars.DB_DATABASE.value],
         )
-
-        valid_conn, err = self._test_connection(creds)
-        if valid_conn:
-            self._valid_creds = creds
-            return creds
-
-        if retry:
-            try:
-                self.cfg.eval_change_origin()
-            except ConfigError:
-                raise RuntimeError(f"Error while connecting to database. {err}")
-            return self.get_creds(retry=False)
-
-        raise RuntimeError(f"Error while connecting to database. {err}")
 
     def get_database(self) -> str:
         """
@@ -385,8 +319,7 @@ class CredsConfigurator:
         str
             The name of the database from the credentials.
         """
-        creds = self.get_creds()
-        return creds[4]
+        return self.get_creds()[4]
 
 
 ##############################
@@ -394,9 +327,7 @@ class CredsConfigurator:
 ##############################
 
 
-def get_connection(
-    configurator: CredsConfigurator,
-) -> psycopg2.extensions.connection:
+def get_connection() -> psycopg2.extensions.connection:
     """
     Create a PostgreSQL database connection with autocommit enabled.
 
@@ -404,32 +335,14 @@ def get_connection(
     from the configurator. The connection is configured for immediate
     commit of all operations.
 
-    Parameters
-    ----------
-    configurator : CredsConfigurator
-        The credential configurator instance containing validated
-        database connection parameters.
-
     Returns
     -------
     psycopg2.extensions.connection
         An active PostgreSQL connection with autocommit enabled.
-
-    Raises
-    ------
-    RuntimeError
-        If the connection cannot be established despite having
-        validated credentials.
     """
-    host, port, user, password, db = configurator.get_creds()
+    host, port, user, password, db = CredsConfigurator().get_creds()
     try:
-        return psycopg2.connect(
-            host=host,
-            port=port,
-            database=db,
-            user=user,
-            password=password,
-        )
+        return psycopg2.connect(host=host, port=port, database=db, user=user, password=password)
     except Exception as e:
         msg = f"Unable to connect to postgres with validated credentials. Exception: {e.__class__}. Error: {e.args}"
         LOGGER.exception(msg)
@@ -441,11 +354,7 @@ def get_connection(
 ##############################
 
 
-def cleanup(
-    tables: list[str],
-    tmp_dir: Path,
-    configurator: CredsConfigurator,
-) -> None:
+def cleanup(tables: list[str], tmp_dir: Path) -> None:
     """
     Clean up database tables and temporary directories.
 
@@ -459,18 +368,9 @@ def cleanup(
         List of table names to drop from the database.
     tmp_dir : Path
         The temporary directory path to remove.
-    configurator : CredsConfigurator
-        The credential configurator for database connection.
-
-
-    Raises
-    ------
-    RuntimeError
-        If database operations fail during cleanup. The temporary
-        directory removal will still be attempted.
     """
     try:
-        connection = get_connection(configurator)
+        connection = get_connection()
         with connection:
             with connection.cursor() as cursor:
                 for table in tables:

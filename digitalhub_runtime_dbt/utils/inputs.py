@@ -11,13 +11,13 @@ from digitalhub.entities.dataitem.crud import new_dataitem
 from digitalhub.utils.exceptions import EntityError
 from digitalhub.utils.logger import LOGGER
 
+from digitalhub_runtime_dbt.utils.configuration import CredsConfigurator
+
 if typing.TYPE_CHECKING:
     from digitalhub.entities.dataitem.table.entity import DataitemTable
 
-    from digitalhub_runtime_dbt.utils.configuration import CredsConfigurator
 
-
-def materialize_dataitem(dataitem: DataitemTable, name: str, configurator: CredsConfigurator) -> str:
+def materialize_dataitem(dataitem: DataitemTable, name: str) -> str:
     """
     Materialize dataitem in postgres.
 
@@ -27,24 +27,17 @@ def materialize_dataitem(dataitem: DataitemTable, name: str, configurator: Creds
         The dataitem.
     name : str
         The parameter SQL name.
-    configurator : CredsConfigurator
-        Creds configurator.
 
     Returns
     -------
     str
         The materialized table name.
-
-    Raises
-    ------
-    EntityError
-        If something got wrong during dataitem materialization.
     """
     try:
         LOGGER.info(f"Collecting dataitem '{dataitem.name}' as dataframe.")
         df = dataitem.as_df()
 
-        database = configurator.get_database()
+        database = CredsConfigurator().get_database()
         table_name = f"{name}_v{dataitem.id}"
         LOGGER.info(f"Creating new dataitem '{table_name}'.")
         materialized_path = f"sql://{database}/public/{table_name}"
